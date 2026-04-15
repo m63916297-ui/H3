@@ -1,0 +1,213 @@
+INCIDENTS.JSON:
+[]
+
+USERS.JSON:
+[]
+
+================================================================================
+VARIABLES DEL REGISTRO DE USUARIO
+================================================================================
+
+Campo          | Tipo    | Descripcion
+----------------|---------|----------------------------------------------
+id             | INTEGER | Identificador unico auto-incremental
+username       | TEXT    | Nombre de usuario unico
+email          | TEXT    | Correo electronico del usuario
+password_hash  | TEXT    | Contrasena hasheada
+full_name      | TEXT    | Nombre completo (opcional)
+phone          | TEXT    | Numero de telefono (opcional)
+created_at     | TEXT    | Fecha y hora de creacion (ISO format)
+
+================================================================================
+VARIABLES DEL REPORTE DE INCIDENTES
+================================================================================
+
+Campo            | Tipo    | Descripcion
+-----------------|---------|----------------------------------------------
+id               | TEXT    | UUID unico del incidente
+title            | TEXT    | Titulo o descripcion breve del incidente
+description      | TEXT    | Descripcion detallada del incidente
+category         | TEXT    | Categoria del incidente
+tipo_reporte     | TEXT    | Tipo: rapido, convivencia, delito
+ley              | TEXT    | Ley aplicable (1801/2016 o 599/2000)
+severity         | TEXT    | Nivel de gravedad del incidente
+fuente            | TEXT    | Fuente de origen del reporte
+location         | OBJECT  | Objeto con latitud, longitud, direccion
+  - latitude     | FLOAT   | Coordenada de latitud
+  - longitude    | FLOAT   | Coordenada de longitud
+  - address      | TEXT    | Direccion aproximada
+reporter_name    | TEXT    | Nombre del reportante
+reporter_contact | TEXT    | Contacto del reportante (telefono/email)
+reporter_type    | TEXT    | Tipo: Nombre, Telefono, Email, Anonimo
+es_anonimo       | BOOLEAN | Indicador si es reporte anonimo
+status           | TEXT    | Estado del incidente (recibido, en_proceso, etc)
+timestamp        | TEXT    | Fecha y hora del reporte (ISO format)
+created_at       | TEXT    | Fecha de creacion en sistema
+updated_at       | TEXT    | Fecha de ultima actualizacion
+
+
+
+Aquí tienes un **prompt maestro, listo para copiar y pegar**, estructurado como una especificación técnica completa. Puedes usarlo directamente con un asistente de IA, como documento de requerimientos para un equipo de desarrollo, o como guía de arquitectura.
+
+---
+
+# 📋 PROMPT MAESTRO: Aplicación de Reporte y Análisis de Incidentes Urbanos con Streamlit, FastAPI y H3
+
+## 🎯 CONTEXTO Y OBJETIVO
+Diseña e implementa una aplicación web completa en Python que permita a ciudadanos y autoridades **reportar incidentes urbanos** (hurto, violencia, conflictos de convivencia), **visualizarlos geoespacialmente** mediante la cuadrícula hexagonal `h3-py`, y **exponer una API REST** construida con FastAPI para integrar este sistema con servicios externos (alertas ciudadanas, dashboards institucionales, APIs de emergencias, etc.).
+
+La solución debe priorizar: usabilidad, precisión geoespacial, escalabilidad, interoperabilidad y buenas prácticas de desarrollo.
+
+---
+
+## 🏗️ ARQUITECTURA PROPUESTA
+```
+[Frontend] Streamlit (UI interactiva, mapas, formularios, dashboards)
+      ↓ HTTP/REST
+[Backend] FastAPI (API REST, validación, lógica de negocio, orquestación)
+      ↓ ORM/SQL
+[Base de Datos] PostgreSQL + PostGIS o SQLite (para prototipado)
+      ↓ Cálculo geoespacial
+[Procesamiento H3] h3-py (indexación, agregación, neighbors, k-ring)
+      ↓ HTTP Async
+[Servicios Externos] FastAPI como proxy/agregador (webhooks, polling, sincro/async)
+```
+
+---
+
+## 📦 STACK TECNOLÓGICO REQUERIDO
+- **Lenguaje:** Python 3.10+
+- **Frontend/UI:** `streamlit`, `streamlit-folium` o `pydeck`
+- **Backend/API:** `fastapi`, `uvicorn`, `pydantic`, `httpx`
+- **Geoespacial:** `h3` (v4+), `geopandas`, `shapely`, `folium`/`plotly`
+- **Datos/DB:** `sqlalchemy`, `alembic`, `psycopg2` o `aiosqlite`
+- **Utilidades:** `python-dotenv`, `loguru`, `pydantic-settings`, `croniter` (opcional para jobs)
+- **DevOps (opcional):** `Docker`, `docker-compose`, `pytest`, `pre-commit`
+
+---
+
+## 🔧 FUNCIONALIDADES DETALLADAS
+
+### 1. Formulario de Reporte (Streamlit)
+- Campos: tipo de incidente (`hurto`, `violencia`, `convivencia`), coordenadas GPS (lat/lng), dirección textual (opcional), fecha/hora, descripción breve, nivel de gravedad (1-5), carga de evidencia (imagen/audio opcional).
+- Validación en cliente y servidor: rangos lat/lng válidos, campos obligatorios, sanitización de texto.
+- Geocodificación inversa opcional para mostrar dirección legible.
+
+### 2. Indexación H3 Automática
+- Al guardar, calcular automáticamente el índice H3 (resolución 7 u 8 configurable vía `.env`).
+- Almacenar: `h3_index`, `h3_center_lat`, `h3_center_lng`, `resolution`.
+- Permitir consulta por `k-ring` (vecinos hexagonales) para análisis de densidad.
+
+### 3. Visualización Interactiva
+- Mapa con hexágonos coloreados por:
+  - Densidad de incidentes
+  - Tipo predominante
+  - Temporalidad (filtro por rango de fechas)
+- Capas superponibles: límites administrativos, zonas de alto riesgo, reportes recientes.
+- Tooltips con métricas por hexágono: conteo, tipos, fechas, tendencia.
+
+### 4. Dashboard Analítico
+- KPIs: total reportes, distribución por tipo, picos horarios/diarios, hexágonos críticos.
+- Gráficas: series temporales, distribución geográfica, comparativa por tipo/gravedad.
+- Exportación: CSV/JSON filtrado.
+
+### 5. Integración con Servicios Externos (FastAPI)
+- Endpoints para recibir/enviar datos a APIs de terceros (alertas SMS, CRM municipal, sistemas de emergencia).
+- Patrón: cola asíncrona con `httpx` + reintentos exponenciales + logging estructurado.
+- Webhooks configurables vía UI o `.env`.
+
+---
+
+## 🌐 DISEÑO DE LA API REST (FastAPI)
+
+| Método | Ruta | Descripción | Auth |
+|--------|------|-------------|------|
+| `POST` | `/api/v1/incidents` | Crear reporte | API Key / JWT |
+| `GET` | `/api/v1/incidents` | Listar con filtros (tipo, fecha, h3_index, bbox) | Opcional |
+| `GET` | `/api/v1/incidents/{id}` | Detalle | Opcional |
+| `PUT` | `/api/v1/incidents/{id}` | Actualizar | JWT |
+| `DELETE` | `/api/v1/incidents/{id}` | Eliminar/Anular | JWT |
+| `GET` | `/api/v1/h3/{index}/density` | Agregación por hexágono + k-ring | API Key |
+| `POST` | `/api/v1/external/sync` | Trigger sincronización con servicio externo | JWT |
+| `GET` | `/api/v1/health` | Estado del servicio | Pública |
+
+**Requisitos API:**
+- Documentación OpenAPI/Swagger automática (`/docs`)
+- Validación estricta con Pydantic v2
+- Rate limiting básico (`slowapi` o middleware custom)
+- Respuestas estandarizadas: `{ "status": "ok", "data": {...}, "meta": {...} }`
+- Manejo de errores con `HTTPException` y logs estructurados
+
+---
+
+## 🗺️ INTEGRACIÓN CON H3 Y VISUALIZACIÓN
+
+- Usar `h3.latlng_to_cell(lat, lng, resolution)` para asignar índice.
+- Generar hexágonos para mapa con `h3.cell_to_boundary(index)` → convertir a GeoJSON.
+- Agrupar incidentes con `pandas` + `h3` y calcular métricas por celda.
+- Cache de resultados H3 con `functools.lru_cache` o Redis (si escala).
+- Resolución recomendada: `7` (manzanas/barrios) o `8` (cuadras). Configurable.
+
+---
+
+## 🔒 SEGURIDAD, VALIDACIÓN Y RENDIMIENTO
+
+- **Autenticación:** JWT para usuarios registrados, API Keys para servicios externos.
+- **Autorización:** Roles (`ciudadano`, `operador`, `admin`).
+- **Validación:** Pydantic schemas + sanitización de inputs + prevención XSS/SQLi.
+- **Privacidad:** Anonimización opcional de ubicación (jitter ±50m) antes de exposición pública.
+- **Rendimiento:** 
+  - Consultas H3 precalculadas o materializadas.
+  - `async/await` en FastAPI para I/O.
+  - Paginación y filtros indexados en DB.
+  - Cache de capas de mapa en Streamlit (`@st.cache_data`).
+
+---
+
+## 📁 ESTRUCTURA DEL PROYECTO SUGERIDA
+```
+incidentes-app/
+├── app/                  # Streamlit frontend
+│   ├── pages/            # Multi-página (reportar, mapa, dashboard, config)
+│   ├── components/       # Widgets reutilizables
+│   └── utils.py          # Helpers de UI
+├── api/                  # FastAPI backend
+│   ├── routers/          # Endpoints por dominio
+│   ├── models.py         # Pydantic schemas
+│   ├── dependencies.py   # Auth, DB session, rate limit
+│   └── external.py       # Lógica de integración APIs externas
+├── core/                 # Configuración, logging, h3_utils, security
+├── db/                   # SQLAlchemy models, alembic, migrations
+├── tests/                # Pytest unit/integration
+├── docker/               # Dockerfile, docker-compose.yml
+├── .env.example
+├── requirements.txt
+└── README.md
+```
+
+---
+
+## 🚀 DESPLIEGUE Y ENTREGABLES ESPERADOS
+
+1. **Código funcional** con estructura modular y comentarios claros.
+2. **Scripts de inicialización:** `alembic upgrade head`, seed data opcional.
+3. **Instrucciones de ejecución local:** `uvicorn api.main:app --reload`, `streamlit run app/main.py`.
+4. **Dockerización:** `docker-compose up` con FastAPI + Streamlit + DB.
+5. **Documentación:** 
+   - README con setup, variables de entorno, ejemplos de cURL para API.
+   - OpenAPI `/docs` y `/redoc`.
+   - Diagrama de flujo de datos y arquitectura.
+6. **Pruebas básicas:** `pytest` para endpoints críticos y cálculo H3.
+
+---
+
+## ✅ INSTRUCCIONES DE EJECUCIÓN PARA EL MODELO / DESARROLLADOR
+1. Genera el código completo siguiendo la estructura y stack indicados.
+2. Prioriza modularidad: separa claramente lógica de H3, API, DB y UI.
+3. Incluye manejo de errores, validación estricta y comentarios explicativos.
+4. Proporciona ejemplos de payloads JSON para crear/consultar incidentes.
+5. Explica cómo ajustar la resolución H3 y conectar un servicio externo vía webhook.
+6. Si algún componente requiere configuración externa (DB, API keys), documenta las variables de `.env.example`.
+7. Entrega el código en bloques bien identificados por archivo/carpeta.
+
+
